@@ -447,36 +447,135 @@ function renderTable() {
 function exportExcel() {
   if (!allResults.length) return;
   const wb = XLSX.utils.book_new();
+  const s = currentSettings;
+
+  // ── Sheet 1: Full Deal Analysis ──────────────────────────────────────
   const allRows = allResults.map(r => ({
-    SKU: r.sku, UPC: r.upc, ASIN: r.asin, Product: r.title,
-    'Invoice Cost': r.cost, 'True Cost': r.true_cost,
-    'Current BB': r.price_current, '30d Avg': r.price_avg30,
-    '90d Avg': r.price_avg90, '180d Avg': r.price_avg180,
-    'Price Used': r.amz_price, 'Ref %': r.referral_pct,
-    'Ref $': r.referral_fee, 'P&P Fee': r.pp_fee,
-    'Total FBA': r.fba_fee, 'Fee Source': r.fee_source,
-    'Net Sale': r.net_sale, 'Net Profit': r.net_profit, 'ROI %': r.roi,
-    'Ever Hit': r.ever_hit ? 'YES' : 'NO',
-    'Peak All': r.peak_all, 'Peak Selected': r.peak_filtered,
-    'Avg Selected': r.avg_filtered, 'Sug. Qty': r.suggested_qty,
-    'Qty Basis': r.qty_basis_str,
+    'SKU': r.sku || '',
+    'UPC': r.upc || '',
+    'ASIN': r.asin || '',
+    'Product Name': r.title || '',
+    'Invoice Cost': r.cost,
+    'True Cost (w/ OH%)': r.true_cost,
+    'Current Buy Box': r.price_current,
+    '30-Day Avg BB': r.price_avg30,
+    '90-Day Avg BB': r.price_avg90,
+    '180-Day Avg BB': r.price_avg180,
+    '365-Day Avg BB': r.price_avg365,
+    'Price Used for ROI': r.amz_price,
+    'Referral Fee %': r.referral_pct,
+    'Referral Fee $': r.referral_fee,
+    'P&P Fee': r.pp_fee,
+    'Fee Source': r.fee_source || '',
+    'Total FBA Fees': r.fba_fee,
+    'Net Sale (Price-Fees)': r.net_sale,
+    'Net Profit (Sale-Cost)': r.net_profit,
+    'ROI %': r.roi,
+    [`Ever ${s.threshold}+ in 12mo`]: r.ever_hit ? 'YES ✓' : 'NO ✗',
+    'Peak (All Months)': r.peak_all,
+    'Peak (Selected Months)': r.peak_filtered,
+    'Avg Sales (Selected Mo.)': r.avg_filtered,
+    'Suggested Order Qty': r.suggested_qty,
+    'Qty Basis': r.qty_basis_str || '',
     'Target Buy Price': r.target_supplier,
-    'Gap': r.price_gap != null ? '$'+r.price_gap.toFixed(2) : '—',
+    'Gap to Target': r.price_gap != null ? (r.price_gap <= 0 ? '✓ On target' : 'Need $'+r.price_gap.toFixed(2)+' lower') : '—',
     '% Off Needed': r.pct_off,
-    'Low Profit': r.low_profit ? '⚠ Below min $' : '✓ OK',
-    Decision: r.decision,
+    'Low Profit Flag': r.low_profit ? '⚠ Below min $' : '✓ OK',
+    'Decision': r.decision || '',
+    'Error': r.error || '',
   }));
+
+  // Add monthly sales columns
+  const monthKeys = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    let m = now.getMonth() + 1 - i;
+    let y = now.getFullYear();
+    while (m <= 0) { m += 12; y--; }
+    monthKeys.push(`${y}-${String(m).padStart(2,'0')}`);
+  }
+  allRows.forEach((row, i) => {
+    const r = allResults[i];
+    monthKeys.forEach(mk => {
+      row[mk] = (r.monthly && r.monthly[mk]) ? r.monthly[mk] : null;
+    });
+  });
+
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), 'Deal Analysis');
 
-  const po = allResults.filter(r => r.decision !== 'Pass' && r.suggested_qty > 0);
+  // ── Sheet 2: Buy List ────────────────────────────────────────────────
+  const buys = allResults.filter(r => r.decision !== 'Pass' && (r.suggested_qty || 0) > 0);
+  const buyRows = buys.map(r => ({
+    'SKU': r.sku || '',
+    'UPC': r.upc || '',
+    'ASIN': r.asin || '',
+    'Product Name': r.title || '',
+    'Invoice Cost': r.cost,
+    'True Cost': r.true_cost,
+    'Amazon Price': r.amz_price,
+    'Net Profit': r.net_profit,
+    'ROI %': r.roi,
+    'Target Buy Price': r.target_supplier,
+    'Gap to Target': r.price_gap != null ? (r.price_gap <= 0 ? '✓ On target' : 'Need $'+r.price_gap.toFixed(2)+' lower') : '—',
+    '% Off Needed': r.pct_off,
+    'Peak (Selected)': r.peak_filtered,
+    'Avg (Selected)': r.avg_filtered,
+    'Suggested Qty': r.suggested_qty,
+    'Qty Basis': r.qty_basis_str || '',
+    'Low Profit Flag': r.low_profit ? '⚠ Below min $' : '✓ OK',
+    'Decision': r.decision || '',
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buyRows), 'Buy List');
+
+  // ── Sheet 3: Target PO ───────────────────────────────────────────────
+  const po = allResults.filter(r => r.decision !== 'Pass' && (r.suggested_qty || 0) > 0);
   const poRows = po.map(r => ({
-    'Product Name': r.title, UPC: r.upc, ASIN: r.asin,
-    Quantity: r.suggested_qty,
+    'Product Name': r.title || '',
+    'UPC': r.upc || '',
+    'ASIN': r.asin || '',
+    'Quantity': r.suggested_qty,
     'Target Buy Price': r.target_supplier,
     '% Off Needed': r.pct_off,
     'Min Profit Flag': r.low_profit ? '⚠ Below min $' : '✓ OK',
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(poRows), 'Target PO');
+
+  // ── Sheet 4: Summary ─────────────────────────────────────────────────
+  const n_buy    = allResults.filter(r => r.decision === 'Buy').length;
+  const n_review = allResults.filter(r => r.decision === 'Review').length;
+  const n_pass   = allResults.filter(r => r.decision === 'Pass').length;
+  const n_found  = allResults.filter(r => r.found).length;
+  const n_ever   = allResults.filter(r => r.ever_hit).length;
+  const po_items = allResults.filter(r => r.decision !== 'Pass');
+  const tc       = po_items.reduce((s,r) => s + (r.cost||0)*(r.suggested_qty||0), 0);
+  const ep       = po_items.reduce((s,r) => s + (r.net_profit||0)*(r.suggested_qty||0), 0);
+  const rois     = po_items.filter(r => r.roi != null).map(r => r.roi);
+  const avg_roi  = rois.length ? (rois.reduce((a,b)=>a+b,0)/rois.length).toFixed(1) : 0;
+
+  const summaryRows = [
+    { Metric: 'Generated', Value: new Date().toLocaleString() },
+    { Metric: 'Total SKUs Analyzed', Value: allResults.length },
+    { Metric: 'Found in Keepa', Value: n_found },
+    { Metric: `Ever Hit ${s.threshold}+ in 12 Months`, Value: n_ever },
+    { Metric: '', Value: '' },
+    { Metric: 'Buy Decisions', Value: n_buy },
+    { Metric: 'Review Decisions', Value: n_review },
+    { Metric: 'Pass Decisions', Value: n_pass },
+    { Metric: '', Value: '' },
+    { Metric: 'Total PO Cost', Value: '$'+tc.toFixed(2) },
+    { Metric: 'Estimated Total Profit', Value: '$'+ep.toFixed(2) },
+    { Metric: 'Average ROI (Buy Items)', Value: avg_roi+'%' },
+    { Metric: '', Value: '' },
+    { Metric: 'Settings Used', Value: '' },
+    { Metric: 'Sales Threshold', Value: s.threshold },
+    { Metric: 'Min ROI %', Value: s.min_roi+'%' },
+    { Metric: 'Min Profit $', Value: '$'+s.min_profit },
+    { Metric: 'Overhead %', Value: s.overhead+'%' },
+    { Metric: 'Price Basis', Value: s.price_basis },
+    { Metric: 'Order Basis', Value: s.order_basis === 'avg' ? `avg x ${s.order_pct}%` : 'peak' },
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
+
   XLSX.writeFile(wb, 'ottrd_analysis_' + new Date().toISOString().slice(0,10) + '.xlsx');
 }
 </script>
