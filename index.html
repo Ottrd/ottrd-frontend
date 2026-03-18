@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ottrd — Amazon Deal Underwriting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--gold:#f0a500;--bg:#0d0d0d;--card:#1a1a1a;--border:rgba(255,255,255,0.08);--text:#f0f0f0;--muted:rgba(240,240,240,0.5)}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;min-height:100vh}
+  nav{position:sticky;top:0;z-index:100;background:rgba(13,13,13,0.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 24px;justify-content:space-between}
+  .logo{font-size:22px;font-weight:800;cursor:pointer;background:none;border:none;color:var(--text);letter-spacing:-0.5px}
+  .logo span{color:var(--gold)}
+  .nav-btn{background:var(--gold);border:none;cursor:pointer;color:#0d0d0d;font-size:14px;font-weight:700;padding:8px 18px;border-radius:8px;font-family:inherit}
+  .page{display:none}.page.active{display:block}
+  /* Hero */
+  .hero{min-height:calc(100vh - 60px);display:flex;align-items:center;justify-content:center;text-align:center;padding:60px 24px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(240,165,0,0.07) 0%,transparent 70%);pointer-events:none}
+  .badge{display:inline-block;background:rgba(240,165,0,0.15);color:var(--gold);border:1px solid rgba(240,165,0,0.3);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;letter-spacing:0.05em;margin-bottom:24px}
+  h1{font-size:clamp(60px,12vw,100px);font-weight:800;letter-spacing:-4px;line-height:1;margin-bottom:20px}
+  .hero-sub{font-size:18px;color:rgba(240,240,240,0.6);line-height:1.7;margin-bottom:36px;max-width:520px;margin-left:auto;margin-right:auto}
+  .features{display:flex;flex-direction:column;gap:8px;align-items:flex-start;display:inline-flex;margin-bottom:40px;text-align:left}
+  .feature{display:flex;align-items:center;gap:10px;font-size:14px;color:rgba(240,240,240,0.7)}
+  .feature::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+  .cta{background:var(--gold);color:#0d0d0d;border:none;cursor:pointer;font-size:16px;font-weight:700;padding:14px 32px;border-radius:10px;font-family:inherit;letter-spacing:-0.3px}
+  /* Analyze page */
+  .content{max-width:860px;margin:0 auto;padding:40px 24px 80px}
+  .page-title{font-size:28px;font-weight:700;letter-spacing:-0.8px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:16px}
+  .card-label{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:14px}
+  .dropzone{border:2px dashed rgba(255,255,255,0.15);border-radius:10px;padding:36px 24px;text-align:center;cursor:pointer;transition:all 0.2s}
+  .dropzone:hover,.dropzone.active{border-color:var(--gold);background:rgba(240,165,0,0.05)}
+  .drop-icon{font-size:32px;margin-bottom:8px}
+  .drop-text{font-size:15px;color:rgba(240,240,240,0.8);margin-bottom:4px}
+  .file-hint{font-size:12px;color:rgba(240,240,240,0.4);margin-top:4px}
+  .file-name{font-size:15px;font-weight:600;color:var(--gold)}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .setting-label{display:flex;flex-direction:column;gap:8px;font-size:13px;color:rgba(240,240,240,0.7)}
+  .setting-row{display:flex;align-items:center;gap:10px}
+  .setting-row input[type=range]{flex:1;accent-color:var(--gold)}
+  .setting-val{font-size:14px;font-weight:600;color:var(--text);min-width:52px;text-align:right}
+  .radio-group{display:flex;flex-direction:column;gap:10px}
+  .radio-label{display:flex;align-items:center;gap:8px;font-size:14px;color:rgba(240,240,240,0.8);cursor:pointer}
+  input[type=radio],input[type=checkbox]{accent-color:var(--gold)}
+  .check-group{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .check-label{display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(240,240,240,0.7);cursor:pointer}
+  .hint{font-size:12px;color:rgba(240,240,240,0.45);margin-bottom:4px}
+  .month-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+  .month-btn{padding:8px 0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:rgba(240,240,240,0.6);font-size:13px;cursor:pointer;font-family:inherit;transition:all 0.15s}
+  .month-btn.active{background:rgba(240,165,0,0.2);border-color:var(--gold);color:var(--gold);font-weight:600}
+  .presets{display:flex;gap:8px;flex-wrap:wrap}
+  .preset-btn{padding:5px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:rgba(240,240,240,0.7);font-size:12px;cursor:pointer;font-family:inherit}
+  .preset-btn:hover{background:rgba(255,255,255,0.1)}
+  .inline-num{width:52px;padding:2px 6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:var(--text);font-size:13px;margin:0 4px}
+  .run-btn{width:100%;padding:16px;background:var(--gold);color:#0d0d0d;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit;letter-spacing:-0.3px}
+  .run-btn:disabled{opacity:0.5;cursor:not-allowed}
+  .progress-bar{height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:12px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--gold);transition:width 0.4s;width:0%}
+  .error-box{background:rgba(200,50,50,0.15);border:1px solid rgba(200,50,50,0.3);border-radius:10px;padding:12px 16px;font-size:14px;color:#ff8080;margin-bottom:16px}
+  /* Results */
+  .results-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+  .results-sub{font-size:14px;color:var(--muted);margin-top:4px}
+  .export-btn{background:var(--gold);color:#0d0d0d;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .metric-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .metric-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .metric-val{font-size:24px;font-weight:700;letter-spacing:-0.5px}
+  .metric-val.green{color:#4caf82}
+  .metric-val.amber{color:#f0a500}
+  .metric-val.red{color:#ef5350}
+  .filter-row{display:flex;gap:8px;margin-bottom:12px}
+  .filter-btn{padding:6px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:rgba(240,240,240,0.6);font-size:13px;cursor:pointer;font-family:inherit}
+  .filter-btn.active{background:rgba(240,165,0,0.15);border-color:var(--gold);color:var(--gold)}
+  .table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.05)}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,0.02)}
+  .badge-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-buy{background:#e8f5e9;color:#1b5e20}
+  .badge-review{background:#fffde7;color:#f57f17}
+  .badge-pass{background:#f5f5f5;color:#666}
+  .badge-low{background:#fdebd0;color:#7a4a00;border:1px solid #f0c070}
+  .status-msg{font-size:14px;color:var(--muted);margin-top:8px;text-align:center}
+</style>
+</head>
+<body>
+
+<nav>
+  <button class="logo" onclick="showPage('home')"><span>O</span>ttrd</button>
+  <button class="nav-btn" onclick="showPage('analyze')">New Analysis</button>
+</nav>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div>
+      <div class="badge">Amazon Deal Underwriting</div>
+      <h1><span style="color:var(--gold)">O</span>ttrd</h1>
+      <p class="hero-sub">Upload your supplier linesheet. We pull 12 months of Keepa data, calculate true ROI, and generate your purchase order — in minutes.</p>
+      <div class="features">
+        <div class="feature">Real Keepa sales data</div>
+        <div class="feature">True cost with overhead</div>
+        <div class="feature">Target buy price calculator</div>
+        <div class="feature">Multi-ASIN per UPC</div>
+        <div class="feature">Color-coded Excel export</div>
+      </div>
+      <button class="cta" onclick="showPage('analyze')">Start Analysis →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYZE -->
+<div id="page-analyze" class="page">
+  <div class="content">
+    <h2 class="page-title">New Analysis</h2>
+    <div id="error-box" class="error-box" style="display:none"></div>
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card-label">Step 1 — Upload linesheet</div>
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('active')"
+        ondragleave="this.classList.remove('active')"
+        ondrop="event.preventDefault();this.classList.remove('active');handleFile(event.dataTransfer.files[0])">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text" id="drop-text">Drop your CSV or Excel file here</div>
+        <div class="file-hint">or click to browse</div>
+      </div>
+      <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])"/>
+    </div>
+
+    <!-- Thresholds -->
+    <div class="card">
+      <div class="card-label">Step 2 — Deal thresholds</div>
+      <div class="settings-grid">
+        <label class="setting-label">Sales threshold (units/mo)
+          <div class="setting-row">
+            <input type="range" min="1" max="500" step="10" value="50" id="s-threshold" oninput="document.getElementById('v-threshold').textContent=this.value"/>
+            <span class="setting-val" id="v-threshold">50</span>
+          </div>
+        </label>
+        <label class="setting-label">Min ROI %
+          <div class="setting-row">
+            <input type="range" min="0" max="200" step="5" value="30" id="s-roi" oninput="document.getElementById('v-roi').textContent=this.value+'%'"/>
+            <span class="setting-val" id="v-roi">30%</span>
+          </div>
+        </label>
+        <label class="setting-label">Min profit $ per unit
+          <div class="setting-row">
+            <input type="range" min="0" max="50" step="0.5" value="2" id="s-profit" oninput="document.getElementById('v-profit').textContent='$'+parseFloat(this.value).toFixed(2)"/>
+            <span class="setting-val" id="v-profit">$2.00</span>
+          </div>
+        </label>
+        <label class="setting-label">Overhead markup %
+          <div class="setting-row">
+            <input type="range" min="0" max="100" step="0.5" value="15" id="s-overhead" oninput="document.getElementById('v-overhead').textContent=this.value+'%'"/>
+            <span class="setting-val" id="v-overhead">15%</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Price basis -->
+    <div class="card">
+      <div class="card-label">Step 3 — Price basis for ROI</div>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="pb" value="min_selected" checked onchange="togglePbChecks()"> Min of selected (recommended)</label>
+        <label class="radio-label"><input type="radio" name="pb" value="current" onchange="togglePbChecks()"> Today's buy box</label>
+        <label class="radio-label"><input type="radio" name="pb" value="avg30" onchange="togglePbChecks()"> 30-day avg</label>
+        <label class="radio-label"><input type="radio" name="pb" value="avg90" onchange="togglePbChecks()"> 90-day avg</label>
+        <label class="radio-label"><input type="radio" name="pb" value="avg180" onchange="togglePbChecks()"> 180-day avg</label>
+        <label class="radio-label"><input type="radio" name="pb" value="avg365" onchange="togglePbChecks()"> 365-day avg</label>
+      </div>
+      <div id="pb-checks" style="margin-top:12px">
+        <div class="hint">Include in minimum:</div>
+        <div class="check-group">
+          <label class="check-label"><input type="checkbox" id="pb-current" checked> Current</label>
+          <label class="check-label"><input type="checkbox" id="pb-avg30" checked> 30-day</label>
+          <label class="check-label"><input type="checkbox" id="pb-avg90" checked> 90-day</label>
+          <label class="check-label"><input type="checkbox" id="pb-avg180" checked> 180-day</label>
+          <label class="check-label"><input type="checkbox" id="pb-avg365"> 365-day</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Month filter -->
+    <div class="card">
+      <div class="card-label">Step 4 — Peak sales months</div>
+      <div class="month-grid" id="month-grid"></div>
+      <div class="presets">
+        <button class="preset-btn" onclick="setMonths([1,2,3,4,5,6,7,8,9,10,11,12])">All</button>
+        <button class="preset-btn" onclick="setMonths([10,11,12])">Q4 only</button>
+        <button class="preset-btn" onclick="setLast6()">Last 6 months</button>
+      </div>
+    </div>
+
+    <!-- Order qty -->
+    <div class="card">
+      <div class="card-label">Step 5 — Order quantity basis</div>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="ob" value="peak"> Peak of selected months</label>
+        <label class="radio-label">
+          <input type="radio" name="ob" value="avg" checked>
+          Average of selected months ×
+          <input type="number" class="inline-num" id="order-pct" value="50" min="1" max="200"> %
+        </label>
+      </div>
+      <div class="presets" style="margin-top:10px">
+        <button class="preset-btn" onclick="setOrderPct(25)">25%</button>
+        <button class="preset-btn" onclick="setOrderPct(35)">35%</button>
+        <button class="preset-btn" onclick="setOrderPct(50)">50%</button>
+        <button class="preset-btn" onclick="setOrderPct(75)">75%</button>
+        <button class="preset-btn" onclick="setOrderPct(90)">90%</button>
+        <button class="preset-btn" onclick="setOrderPct(100)">100%</button>
+      </div>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="runAnalysis()">▶  Run Analysis</button>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="status-msg" id="status-msg"></div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="page-results" class="page">
+  <div class="content">
+    <div class="results-header">
+      <div>
+        <h2 class="page-title">Analysis Results</h2>
+        <div class="results-sub" id="results-sub"></div>
+      </div>
+      <button class="export-btn" onclick="exportExcel()">Export Excel ↓</button>
+    </div>
+    <div class="metrics" id="metrics"></div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('buy',this)">Buy / Review</button>
+      <button class="filter-btn" onclick="setFilter('pass',this)">Pass</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Product</th><th>UPC</th><th>Cost</th><th>Amz Price</th>
+          <th>Net Profit</th><th>ROI %</th><th>Sug. Qty</th><th>Decision</th>
+        </tr></thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://ottrd-backend.onrender.com';
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let activeMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
+let currentFile = null;
+let allResults = [];
+let currentFilter = 'all';
+let currentSettings = {};
+
+// Build month grid
+const mg = document.getElementById('month-grid');
+MONTHS.forEach((m,i) => {
+  const btn = document.createElement('button');
+  btn.className = 'month-btn active';
+  btn.textContent = m;
+  btn.dataset.month = i+1;
+  btn.onclick = () => toggleMonth(i+1, btn);
+  mg.appendChild(btn);
+});
+
+function toggleMonth(m, btn) {
+  if (activeMonths.includes(m)) {
+    activeMonths = activeMonths.filter(x => x !== m);
+    btn.classList.remove('active');
+  } else {
+    activeMonths.push(m);
+    btn.classList.add('active');
+  }
+}
+
+function setMonths(arr) {
+  activeMonths = arr;
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.classList.toggle('active', arr.includes(parseInt(btn.dataset.month)));
+  });
+}
+
+function setLast6() {
+  const now = new Date();
+  const last6 = [];
+  for (let i = 0; i < 6; i++) {
+    let m = now.getMonth() + 1 - i;
+    while (m <= 0) m += 12;
+    last6.push(m);
+  }
+  setMonths(last6);
+}
+
+function togglePbChecks() {
+  const val = document.querySelector('input[name="pb"]:checked').value;
+  document.getElementById('pb-checks').style.display = val === 'min_selected' ? 'block' : 'none';
+}
+
+function setOrderPct(p) {
+  document.getElementById('order-pct').value = p;
+  document.querySelector('input[name="ob"][value="avg"]').checked = true;
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+function handleFile(f) {
+  if (!f) return;
+  currentFile = f;
+  document.getElementById('drop-text').innerHTML = '<span style="color:var(--gold);font-weight:600">' + f.name + '</span>';
+  document.getElementById('dropzone').classList.add('active');
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-box');
+  b.textContent = msg;
+  b.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-box').style.display = 'none';
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('status-msg').textContent = msg || '';
+}
+
+function getSettings() {
+  return {
+    threshold: parseInt(document.getElementById('s-threshold').value),
+    min_roi: parseFloat(document.getElementById('s-roi').value),
+    min_profit: parseFloat(document.getElementById('s-profit').value),
+    overhead: parseFloat(document.getElementById('s-overhead').value),
+    price_basis: document.querySelector('input[name="pb"]:checked').value,
+    pb_map: {
+      current: document.getElementById('pb-current').checked,
+      avg30:   document.getElementById('pb-avg30').checked,
+      avg90:   document.getElementById('pb-avg90').checked,
+      avg180:  document.getElementById('pb-avg180').checked,
+      avg365:  document.getElementById('pb-avg365').checked,
+    },
+    active_months: activeMonths,
+    order_basis: document.querySelector('input[name="ob"]:checked').value,
+    order_pct: parseInt(document.getElementById('order-pct').value) || 50,
+  };
+}
+
+async function runAnalysis() {
+  if (!currentFile) { showError('Please upload a price sheet first.'); return; }
+  hideError();
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  setProgress(10, 'Sending to server…');
+
+  currentSettings = getSettings();
+  const form = new FormData();
+  form.append('file', currentFile);
+  form.append('settings', JSON.stringify(currentSettings));
+
+  try {
+    setProgress(30, 'Fetching Keepa data…');
+    const res = await fetch(API + '/analyze', { method: 'POST', body: form });
+    setProgress(85, 'Processing results…');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Analysis failed');
+    }
+    const data = await res.json();
+    allResults = data.results || [];
+    setProgress(100, 'Done!');
+    renderResults();
+    showPage('results');
+  } catch(e) {
+    showError('Error: ' + e.message);
+    setProgress(0, '');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶  Run Analysis';
+  }
+}
+
+function renderResults() {
+  const sub = document.getElementById('results-sub');
+  sub.textContent = allResults.length + ' SKUs analyzed';
+
+  const buys = allResults.filter(r => r.decision !== 'Pass');
+  const avgRoi = buys.length ? (buys.reduce((s,r) => s+(r.roi||0),0)/buys.length) : 0;
+  const totalCost = buys.reduce((s,r) => s+(r.cost||0)*(r.suggested_qty||0),0);
+
+  document.getElementById('metrics').innerHTML = [
+    ['Total SKUs', allResults.length, ''],
+    ['Buy / Review', buys.length, 'green'],
+    ['Avg ROI', avgRoi.toFixed(1)+'%', avgRoi>=30?'green':avgRoi>=15?'amber':'red'],
+    ['Total PO Cost', '$'+totalCost.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), ''],
+  ].map(([l,v,c]) => `<div class="metric-card"><div class="metric-label">${l}</div><div class="metric-val ${c}">${v}</div></div>`).join('');
+
+  renderTable();
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function renderTable() {
+  const shown = currentFilter === 'all' ? allResults
+    : currentFilter === 'buy' ? allResults.filter(r => r.decision !== 'Pass')
+    : allResults.filter(r => r.decision === 'Pass');
+
+  document.getElementById('results-body').innerHTML = shown.map(r => {
+    const bg = r.low_profit ? '#fdebd0' : r.decision==='Buy' ? '#0a1f0a' : r.decision==='Review' ? '#1a1a00' : 'transparent';
+    const badge = r.low_profit ? '<span class="badge-pill badge-low">⚠ Low $</span>'
+      : r.decision==='Buy' ? '<span class="badge-pill badge-buy">Buy</span>'
+      : r.decision==='Review' ? '<span class="badge-pill badge-review">Review</span>'
+      : '<span class="badge-pill badge-pass">Pass</span>';
+    const roiColor = r.roi >= 30 ? '#4caf82' : r.roi >= 15 ? '#f0a500' : r.roi != null ? '#ef5350' : 'inherit';
+    const profitColor = r.net_profit > 0 ? '#4caf82' : r.net_profit < 0 ? '#ef5350' : 'inherit';
+    return `<tr style="background:${bg}">
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.title||''}">${r.title||'—'}</td>
+      <td style="font-family:monospace;font-size:11px">${r.upc||'—'}</td>
+      <td>${r.cost ? '$'+r.cost.toFixed(2) : '—'}</td>
+      <td>${r.amz_price ? '$'+r.amz_price.toFixed(2) : '—'}</td>
+      <td style="color:${profitColor};font-weight:600">${r.net_profit != null ? '$'+r.net_profit.toFixed(2) : '—'}</td>
+      <td style="color:${roiColor};font-weight:600">${r.roi != null ? r.roi.toFixed(1)+'%' : '—'}</td>
+      <td style="text-align:center;font-weight:600">${r.suggested_qty || '—'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportExcel() {
+  if (!allResults.length) return;
+  const wb = XLSX.utils.book_new();
+  const allRows = allResults.map(r => ({
+    SKU: r.sku, UPC: r.upc, ASIN: r.asin, Product: r.title,
+    'Invoice Cost': r.cost, 'True Cost': r.true_cost,
+    'Current BB': r.price_current, '30d Avg': r.price_avg30,
+    '90d Avg': r.price_avg90, '180d Avg': r.price_avg180,
+    'Price Used': r.amz_price, 'Ref %': r.referral_pct,
+    'Ref $': r.referral_fee, 'P&P Fee': r.pp_fee,
+    'Total FBA': r.fba_fee, 'Fee Source': r.fee_source,
+    'Net Sale': r.net_sale, 'Net Profit': r.net_profit, 'ROI %': r.roi,
+    'Ever Hit': r.ever_hit ? 'YES' : 'NO',
+    'Peak All': r.peak_all, 'Peak Selected': r.peak_filtered,
+    'Avg Selected': r.avg_filtered, 'Sug. Qty': r.suggested_qty,
+    'Qty Basis': r.qty_basis_str,
+    'Target Buy Price': r.target_supplier,
+    'Gap': r.price_gap != null ? '$'+r.price_gap.toFixed(2) : '—',
+    '% Off Needed': r.pct_off,
+    'Low Profit': r.low_profit ? '⚠ Below min $' : '✓ OK',
+    Decision: r.decision,
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), 'Deal Analysis');
+
+  const po = allResults.filter(r => r.decision !== 'Pass' && r.suggested_qty > 0);
+  const poRows = po.map(r => ({
+    'Product Name': r.title, UPC: r.upc, ASIN: r.asin,
+    Quantity: r.suggested_qty,
+    'Target Buy Price': r.target_supplier,
+    '% Off Needed': r.pct_off,
+    'Min Profit Flag': r.low_profit ? '⚠ Below min $' : '✓ OK',
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(poRows), 'Target PO');
+  XLSX.writeFile(wb, 'ottrd_analysis_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+</script>
+</body>
+</html>
