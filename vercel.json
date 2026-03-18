@@ -1,8 +1,0 @@
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
-  "framework": "create-react-app",
-  "env": {
-    "REACT_APP_API_URL": "https://ottrd-api.onrender.com"
-  }
-}
